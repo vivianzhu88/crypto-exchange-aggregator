@@ -1,0 +1,25 @@
+{
+  "name": "crypto-exchange-aggregator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "apis.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vivianzhu88/crypto-exchange-aggregator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vivianzhu88/crypto-exchange-aggregator/issues"
+  },
+  "homepage": "https://github.com/vivianzhu88/crypto-exchange-aggregator#readme",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "express": "^4.18.1",
+    "nodemon": "^2.0.19"
+  }
+}

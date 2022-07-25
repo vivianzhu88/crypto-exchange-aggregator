@@ -29,43 +29,45 @@ matcha = function() {
     });
 }
 
-matcha()
+// matcha()
 
-class Cex {
-    // Constructor function
-    constructor(baseUrl) {
-        this.baseUrl = baseUrl
-        this.config = {
-            method: 'get',
-            url: this.baseUrl
-        }
+
+// CEX order books
+ftx = function() {
+    config = {
+        method: 'get', 
+        url: `https://ftx.com/api/markets/${baseCurrency}/${quoteCurrency}/orderbook?depth=20`
     }
-
-    // Methods created on Cex.prototype
-    getOrderBook = function() {
-        axios(this.config)
-        .then(function (response) {
-            console.log(JSON.stringify(response.data));
-        })
-        .catch(function (error) {
-            console.log(error);
-        });
-    }
-}
-
-// Initialize
-const ftx = new Cex('https://ftx.com/api/markets/BTC/USDC/orderbook?depth=20')
-ftx.getOrderBook = function() {
     axios(config)
     .then(function (response) {
-        console.log(JSON.stringify(response.data));
+        orderbook = response.data["result"]
+        bids = orderbook["bids"]
+        asks = orderbook["asks"]
+        console.log(bids)
+        console.log(asks)
     })
     .catch(function (error) {
         console.log(console.log(error["response"]["data"]["error"]));
     });
 }
 
-const kucoin = new Cex('https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=BTC-USDC')
+kucoin = function() {
+    config = {
+        method: 'get', 
+        url: `https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=BTC-USDC`
+    }
+    axios(config)
+    .then(function (response) {
+        orderbook = response.data["data"]
+        bids = orderbook["bids"]
+        asks = orderbook["asks"]
+        console.log(bids)
+        console.log(asks)
+    })
+    .catch(function (error) {
+        console.log(console.log(error));
+    });
+}
 
-// ftx.getOrderBook()
-// kucoin.getOrderBook()
+ftx()
+// kucoin()

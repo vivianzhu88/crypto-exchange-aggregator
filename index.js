@@ -1,4 +1,6 @@
+// user variables
 var axios = require('axios');
+const prompt = require('prompt-sync')();
 
 // user variables
 // hard-coded for now
@@ -145,9 +147,48 @@ async function gemini() {
 // kucoin()
 // kraken()
 // gemini()
-
+/*
 gemini()
 .then(data => {
     console.log(data)
 })
 .catch(err => console.log(err))
+*/
+
+//main method
+var init_ticker = prompt("Ticker of the token you have: ");
+var final_ticker = prompt("Ticker of the token you want to trade into: ");
+var init_amount = prompt("How much " + init_ticker + " do you want to trade? ");
+console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_ticker);
+
+//get prices from all exchanges
+//each list inside main list represents a path
+//format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
+output = [
+    [200 , ["Matcha" , 5]],
+    [100000 , ["FTX" , 1 , "USDT", 5 ]],
+    [543291 , ["Kucoin" , 2], ["FTX" , 4], ["Matcha" , 1]]
+];
+//output = get_prices(init_ticker, final_ticker, init_amount);
+
+var output_string;
+for (let i = 0; i < output.length; i++) { //i is path
+    price = output[i][0];
+    output_string = "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + init_ticker + "/" + final_ticker + ")\n\n";
+    for (let j = 1; j < output[i].length; j++) { //j is # exchanges - 1
+        exchange = output[i][j];
+        if (exchange.length > 2){ //there is intermediary token
+            output_string += "  - <" + exchange[0] + "> " + exchange[1] + " " + init_ticker + " to " + exchange[2] + ", " + exchange[3] + " " + exchange[2] +  " to " + final_ticker + "\n";
+        }
+        else{
+            output_string += "  - <" + exchange[0] + "> " + exchange[1] + " " + init_ticker + " to " + final_ticker + "\n";
+        }
+    }
+    console.log(output_string);
+}
+
+
+
+
+
+

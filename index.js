@@ -99,32 +99,10 @@ kraken = function() {
 }
 
 async function gemini() {
-    // config = {
-    //     method: 'get',
-    //     url: `https://api.gemini.com/v1/book/btcusd`
-    // }
-    // axios(config)
-    // .then(function (response) {
-    //     orderbook = response.data
-
-    //     // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
-
-    //     function reformat(obj) {
-    //         for (const [key, value] of Object.entries(obj)) {
-    //             delete value["timestamp"]
-    //             obj[key] = Object.values(value)
-    //         }
-    //         return obj
-    //     }
-        
-    //     bids = reformat(orderbook["bids"])
-    //     asks = reformat(orderbook["asks"])
-    // })
-    // .catch(function (error) {
-    //     console.log(error)
-    // })
+    // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
     function getBidsAsks(response) {
         orderbook = response.data
+
         function bidAskReformat(obj) {
             for (const [key, value] of Object.entries(obj)) {
                 delete value["timestamp"]
@@ -147,13 +125,18 @@ async function gemini() {
 // kucoin()
 // kraken()
 // gemini()
-/*
+
+// we will eventually need a dictionary to store all the prices that we calculate
+// var dict = {'gemini': []}
+
 gemini()
 .then(data => {
-    console.log(data)
+    // bids = data[0]
+    // asks = data[1]
+    // based on the orderbook (bids/asks), invoke a callback function 
+    // to calculate the best execution price
 })
 .catch(err => console.log(err))
-*/
 
 async function get_prices(i_ticker, f_ticker, i_amount){
 

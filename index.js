@@ -155,7 +155,11 @@ gemini()
 .catch(err => console.log(err))
 */
 
-//main method
+async function get_prices(i_ticker, f_ticker, i_amount){
+
+}
+
+//main method ---------------------------------------------------------------------------------------------
 var init_ticker = prompt("Ticker of the token you have: ");
 var final_ticker = prompt("Ticker of the token you want to trade into: ");
 var init_amount = prompt("How much " + init_ticker + " do you want to trade? ");
@@ -166,10 +170,21 @@ console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_t
 //format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
 output = [
     [200 , ["Matcha" , 5]],
-    [100000 , ["FTX" , 1 , "USDT", 5 ]],
-    [543291 , ["Kucoin" , 2], ["FTX" , 4], ["Matcha" , 1]]
+    [543291 , ["Kucoin" , 2], ["FTX" , 4], ["Matcha" , 1]],
+    [100000 , ["FTX" , 1 , "USDT", 5 ]]
 ];
 //output = get_prices(init_ticker, final_ticker, init_amount);
+
+//bubble sort algorithm lowest price -> highest price
+for (var i = 0; i < output.length-1; i++){
+    for (var j = 0, swapping; j < output.length-1; j++){
+        if (output[j][0] > output[j+1][0]){
+            swapping = output[j+1];
+            output[j+1] = output[j];
+            output[j] = swapping;
+        }
+    }
+}
 
 var output_string;
 for (let i = 0; i < output.length; i++) { //i is path

@@ -2,6 +2,7 @@
 const axios = require('axios');
 const prompt = require('prompt-sync')();
 const crypto = require('crypto');
+const { response } = require('express');
 
 // user variables
 // hard-coded for now
@@ -39,30 +40,44 @@ matcha = function() {
 // base urls
 ftxBaseUrl = `https://ftx.us/api`
 
+class ExchangeData {
+    constructor(data) {
+        this.data = {   "exchange": "", 
+                        "orderbook": null,
+                        "fees": {
+                            "gasFee": 0.03, 
+                            "exchangeFee": 0, 
+                            "withdrawalFee": 0
+                        }
+                    }
+    }
+}
+
 async function ftx() {
-    let dict = {"exchange": "ftx", "bids": [], "asks": [], "gasFee":0.03, "exchangeFee":0, "withdrawalFee":0}
+    let ftx = new ExchangeData()
+    ftx.data["exchange"] = "ftx"
 
-    // https://blog.ftx.com/blog/api-authentication/    
-    const FTX_KEY = 'L4dEDrXVRTvQdlzx2BDKJbcYE1s0dDM2edLY8OBW'
-    const FTX_SECRET= 'ZJ4wI4O_n5wsywK0CiS9dj3KSPwb0p3RAE6NH_St'
-    
-    timestamp = Date.now()
-    // signaturePayload = `${timestamp}GET/api/fills?market=DAI/USDT`
-    signaturePayload = `${timestamp}GET/api/account`
-    signature = crypto.createHmac("sha256", encodeURI(FTX_SECRET)).update(encodeURI(signaturePayload)).digest('hex');
-
-    const config = {
-        method: 'get',
-        // url: `${ftxBaseUrl}/markets/DAI/USDT/orderbook?depth=20`,
-        url: `${ftxBaseUrl}/account`,
-
-        // https://stackoverflow.com/questions/69213825/ftx-get-account-info-using-python-gives-not-logged-in-error 
-        headers: {
-            'FTXUS-KEY': FTX_KEY,
-            'FTXUS-SIGN': signature,
-            'FTXUS-TS': timestamp.toString()
+    // Need to add authentication headers for fee-related FTX API requests
+    // https://blog.ftx.com/blog/api-authentication/ 
+    function ftxConfig() {
+        const FTX_KEY = 'L4dEDrXVRTvQdlzx2BDKJbcYE1s0dDM2edLY8OBW'
+        const FTX_SECRET= 'ZJ4wI4O_n5wsywK0CiS9dj3KSPwb0p3RAE6NH_St'
+        
+        timestamp = Date.now()
+        signaturePayload = `${timestamp}GET/api/account` // hard-coded
+        signature = crypto.createHmac("sha256", encodeURI(FTX_SECRET)).update(encodeURI(signaturePayload)).digest('hex');
+        return config = {
+            // https://stackoverflow.com/questions/69213825/ftx-get-account-info-using-python-gives-not-logged-in-error 
+            headers: {
+                'FTXUS-KEY': FTX_KEY,
+                'FTXUS-SIGN': signature,
+                'FTXUS-TS': timestamp.toString()
+            }
         }
     }
+
+    feesUrl = `${ftxBaseUrl}/account`
+    orderBookUrl = `${ftxBaseUrl}/markets/DAI/USDT/orderbook?depth=20`
 
     function getOrderbook(response) {
         orderbook = response.data["result"]
@@ -70,24 +85,29 @@ async function ftx() {
         bids = orderbook["bids"]
         asks = orderbook["asks"]
 
-        return [bids, asks]
+        return {"bids": bids, "asks": asks}
     }
 
-    // const response = await axios.get(`https://ftx.com/api/markets/DAI/USDT/orderbook?depth=20`, config)
-    // return getOrderbook(response)
-
-    const response = await axios(config)
-    return response
+    // axios calls return promises
+    config = ftxConfig()
+    axios.all([
+        axios.get(orderBookUrl, config),
+        axios.get(feesUrl, config),
+    ])
+    .then(responseArr => {
+        // console.log(responseArr)
+        // ftx.data["orderbook"] = getOrderbook(responseArr[0])
+        // console.log(getOrderbook(responseArr[0]))
+        // ftx.data["orderbook"] = "hi"
+        return "hi"
+    });
 }
 
-ftx()
-.then(data => {
-    console.log(data)
+ftx().then(res => {
+    console.log(res)
 })
-.catch(err => 
-    // console.log(err["response"]["data"]["error"])
-    console.log(err)
-)
+
+
 
 kucoin = function() {
     config = {

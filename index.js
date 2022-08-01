@@ -237,7 +237,7 @@ async function gemini() {
 }
 
 // kucoin()
-kraken()
+//kraken()
 // gemini()
 
 let dict = {}
@@ -281,6 +281,13 @@ function get_price_from_orderbook(orderbook, i_amount) {
 
     // now that our caluclated token amount is same as given token amount, we can calculate price per token
     if (total_amount = i_amount){
+        // add fees
+        gasFee = total_value * orderbook["gasFee"];
+        exchangeFee = total_value * orderbook["exchangeFee"];
+        withdrawalFee = total_value * orderbook["withdrawalFee"];
+        total_value += gasFee + exchangeFee + withdrawalFee;
+
+        // find price
         avg_price = total_value / i_amount;
         return avg_price;
     }
@@ -370,6 +377,3 @@ function main() {
 }
 
 main()
-
-
-

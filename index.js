@@ -199,8 +199,35 @@ let dict = {}
 // 'orderbook' is a dictionary
 // ['bids':[[Array], [Array]], 'asks': [[Array], [Array]]]
 // where Array = [price, amount] <-- both in number format
-function getPriceFromOrderbook(orderbook) {
+function get_price_from_orderbook(orderbook, i_amount) {
+    var bids = orderbook["bids"];
+    var total_amount = 0;
+    var total_value = 0;
+    var b = 0;
 
+    // add up bids until wanted amount of tokens is calculated or entire orderbook has been parsed
+    while ((total_amount < i_amount) && (b < bids.length)){
+        total_value += parseFloat(bids[b][0]) * parseFloat(bids[b][1]);
+        total_amount += parseFloat(bids[b][1]);
+        b++;
+    }
+
+    // account for excess or deficiency of token amount
+    if (total_amount > i_amount){
+        b--;
+        excess_amount = total_amount - i_amount;
+        total_value -= (excess_amount * parseFloat(bids[b][0]));
+    }
+    else if (total_amount < i_amount){
+        console.log("Increase orderbook depth current amount: " + total_amount);
+        return null;
+    }
+
+    // now that our caluclated token amount is same as given token amount, we can calculate price per token
+    if (total_amount = i_amount){
+        avg_price = total_value / i_amount;
+        return avg_price;
+    }
 }
 
 // {'exchange1': price, 'exchange2': price}
@@ -212,7 +239,7 @@ async function get_prices(i_ticker, f_ticker, i_amount){
 function main() {
     var init_ticker = prompt("Ticker of the token you have: ");
     var final_ticker = prompt("Ticker of the token you want to trade into: ");
-    var init_amount = prompt("How much " + init_ticker + " do you want to trade? ");
+    var init_amount = parseFloat(prompt("How much " + init_ticker + " do you want to trade? "));
     console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_ticker);
 
     //get prices from all exchanges
@@ -251,6 +278,42 @@ function main() {
         }
         console.log(output_string);
     }
+
+    orderbook = 
+    {
+        "exchange" : "ftx",
+        "bids": [
+            [ '23246.3', '0.81' ],
+            [ '23246.1', '0.06208339' ],
+            [ '23245.6', '0.083' ],
+            [ '23245.4', '0.02281999' ],
+            [ '23244', '0.03208211' ],
+            [ '23242.8', '0.08' ],
+            [ '23240.8', '0.24767706' ],
+            [ '23240.7', '0.0480163' ],
+            [ '23240.4', '0.00128814' ],
+            [ '23240', '0.20497708' ],
+            [ '23235', '0.20181905' ],
+            [ '23230.4', '0.03270318' ],
+            [ '23230.3', '0.2066525' ],
+            [ '23226.1', '0.1292' ],
+            [ '23225.5', '0.21261745' ],
+            [ '23224.8', '0.0449384' ],
+            [ '23224.1', '0.08987299' ],
+            [ '23223.3', '0.00063' ],
+            [ '23222.1', '0.36631511' ],
+            [ '23221.9', '0.01803837' ]
+          ],
+        "asks" : ["blah"],
+        "gasFee" : 0.03, 
+        "exchangeFee" : 0,
+        "withdrawalFee" : 0
+    };
+    price = get_price_from_orderbook(orderbook, init_amount);
+    console.log(price);
 }
+
+main()
+
 
 

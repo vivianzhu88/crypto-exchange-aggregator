@@ -37,11 +37,9 @@ matcha = function() {
 
 // CEX APIs ---------------------------------------------------------------------------------------------
 
-// base urls
-ftxBaseUrl = `https://ftx.us/api`
 
 class ExchangeData {
-    constructor(data) {
+    constructor() {
         this.data = {   "exchange": "", 
                         "orderbook": null,
                         "fees": {
@@ -50,6 +48,9 @@ class ExchangeData {
                             "withdrawalFee": 0
                         }
                     }
+        this.baseUrl = ''
+        this.feesUrl = ''
+        this.orderBookUrl = ''
     }
 }
 
@@ -57,7 +58,11 @@ async function ftx() {
     let ftx = new ExchangeData()
     ftx.data["exchange"] = "ftx"
 
-    // Need to add authentication headers for fee-related FTX API requests
+    ftx.baseUrl = `https://ftx.us`
+    ftx.feesUrl = `${ftx.baseUrl}/api/account`
+    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/DAI/USDT/orderbook?depth=20`
+
+    // add authentication headers for fee-related FTX API requests
     // https://blog.ftx.com/blog/api-authentication/ 
     function ftxConfig() {
         const FTX_KEY = 'L4dEDrXVRTvQdlzx2BDKJbcYE1s0dDM2edLY8OBW'
@@ -76,9 +81,6 @@ async function ftx() {
         }
     }
 
-    feesUrl = `${ftxBaseUrl}/account`
-    orderBookUrl = `${ftxBaseUrl}/markets/DAI/USDT/orderbook?depth=20`
-
     function getOrderbook(response) {
         orderbook = response.data["result"]
 
@@ -88,44 +90,98 @@ async function ftx() {
         return {"bids": bids, "asks": asks}
     }
 
-    // axios calls return promises
-    config = ftxConfig()
-    axios.all([
-        axios.get(orderBookUrl, config),
-        axios.get(feesUrl, config),
-    ])
-    .then(responseArr => {
-        // console.log(responseArr)
-        // ftx.data["orderbook"] = getOrderbook(responseArr[0])
-        // console.log(getOrderbook(responseArr[0]))
-        // ftx.data["orderbook"] = "hi"
-        return "hi"
-    });
+    // TODO: function getFees(response)
+
+    // make async API requests in parallel and
+    // store the responses in an iterable Promise instance
+    function loadData() {
+        config = ftxConfig()
+        return axios.all([
+            axios.get(ftx.orderBookUrl, config),
+            axios.get(ftx.feesUrl, config),
+        ])
+        .then(responseArr => {
+            // this is what the Promise does when it resolves
+            ftx.data["orderbook"] = getOrderbook(responseArr[0])
+            return ftx.data
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+
+    // receive and resolve the Promise and
+    // return the FTX data object
+    return loadData()
 }
 
-ftx().then(res => {
-    console.log(res)
-})
+
+// let allData = {'ftx': null }
+// this logs the right thing - but doesn't change the global variable
+// ftx().then(res => {
+//     // console.log(res)
+//     allData["ftx"] = res
+//     console.log(allData)
+// })
 
 
 
-kucoin = function() {
-    config = {
-        method: 'get', 
-        url: `https://api.kucoin.com/api/v1/market/orderbook/level2_20?symbol=BTC-USDC`
-    }
-    axios(config)
-    .then(function (response) {
+
+async function kucoin() {
+    let kucoin = new ExchangeData()
+    kucoin.data["exchange"] = "kucoin"
+
+    kucoin.baseUrl = 'https://api.kucoin.com'
+    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=BTC-USDC`
+
+    function getOrderbook(response) {
         orderbook = response.data["data"]
+
         bids = orderbook["bids"]
         asks = orderbook["asks"]
-        console.log(bids)
-        console.log(asks)
-    })
-    .catch(function (error) {
-        console.log(error);
-    });
+        
+        return {"bids": bids, "asks": asks}
+    }
+
+    function loadData() {
+        return axios.all([
+            axios.get(kucoin.orderBookUrl)
+        ])
+        .then(responseArr => {
+            kucoin.data["orderbook"] = getOrderbook(responseArr[0])
+            return kucoin.data
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+
+    return loadData()
 }
+
+// call async functions and
+// get resolved value of their Promises
+async function loadAllData() {
+    let allData = {'ftx': null }
+
+    // load data
+    let ftxData = await ftx()
+    let kucoinData = await kucoin() 
+    // test = ftxData["exchange"]
+    // allData[test] = 0
+    // test = kucoinData["exchange"]
+    console.log(kucoinData)
+
+    // return allData
+}
+
+// $ node index.js
+loadAllData().then(allData => {
+    console.log("running")
+    // console.log(allData)
+})
+
+// console.log(allData)
 
 kraken = function() {
     config = {
@@ -181,7 +237,7 @@ async function gemini() {
 }
 
 // kucoin()
-// kraken()
+kraken()
 // gemini()
 
 let dict = {}

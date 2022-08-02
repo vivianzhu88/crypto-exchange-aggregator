@@ -333,10 +333,10 @@ async function getAllPrices(init_ticker, final_ticker, init_amount) {
         }
     }
 
-    var output_string;
+    var output_string = "";
     for (let i = 0; i < output.length; i++) { //i is path
         price = output[i][0];
-        output_string = "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + init_ticker + "/" + final_ticker + ")\n\n";
+        output_string += "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + init_ticker + "/" + final_ticker + ")\n\n";
         for (let j = 1; j < output[i].length; j++) { //j is # exchanges - 1
             exchange = output[i][j];
             if (exchange.length > 2){ //there is intermediary token
@@ -346,7 +346,6 @@ async function getAllPrices(init_ticker, final_ticker, init_amount) {
                 output_string += "  - <" + exchange[0] + "> " + exchange[1] + " " + init_ticker + " to " + final_ticker + "\n";
             }
         }
-        console.log(output_string);
     }
 
     return output_string

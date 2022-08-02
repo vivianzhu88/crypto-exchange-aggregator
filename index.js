@@ -57,12 +57,12 @@ class ExchangeData {
 }
 
 // API docs: https://docs.ftx.com
-async function ftx() {
+async function ftx(initTicker, finalTicker) {
     let ftx = new ExchangeData()
     ftx.data["name"] = "ftx"
 
     ftx.baseUrl = `https://ftx.us`
-    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/${baseCurrency}/${quoteCurrency}/orderbook?depth=${orderbookDepth}`
+    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/${initTicker}/${finalTicker}/orderbook?depth=100` //100 is max
     ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
     // add authentication headers for fee-related FTX API requests
@@ -125,12 +125,12 @@ async function ftx() {
     return loadData()
 }
 
-async function kucoin() {
+async function kucoin(initTicker, finalTicker) {
     let kucoin = new ExchangeData()
     kucoin.data["name"] = "kucoin"
 
     kucoin.baseUrl = 'https://api.kucoin.com'
-    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=BTC-USDC`
+    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2?symbol=${initTicker}-${finalTicker}`
 
     function getOrderbook(response) {
         orderbook = response.data["data"]
@@ -306,8 +306,8 @@ function getExchangePrice(orderbook, fees, i_amount) {
 async function loadAllData(initTicker, finalTicker, initAmount) {
     // load API data from all exchanges in parallel
     return await Promise.allSettled([
-        ftx(), 
-        kucoin(), 
+        ftx(initTicker, finalTicker), 
+        kucoin(initTicker, finalTicker), 
         kraken(initTicker, finalTicker), 
         gemini(initTicker, finalTicker)
     ])

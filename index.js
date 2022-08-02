@@ -40,7 +40,7 @@ class ExchangeData {
                         "orderbook": null,
                         "fees": { // in decimal format
                             "gasFee": 0, 
-                            "exchangeFee": 0, 
+                            "exchangeFee": 0, // maker or taker
                             "withdrawalFee": 0
                         }
                     }
@@ -61,7 +61,7 @@ async function ftx() {
     ftx.data["name"] = "ftx"
 
     ftx.baseUrl = `https://ftx.us`
-    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/DAI/USDT/orderbook?depth=20`
+    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/BTC/USDT/orderbook?depth=20`
     ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
     // add authentication headers for fee-related FTX API requests

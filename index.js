@@ -37,30 +37,30 @@ matcha = function() {
 
 // CEX APIs ---------------------------------------------------------------------------------------------
 
-
 class ExchangeData {
     constructor() {
         this.data = {   "exchange": "", 
                         "orderbook": null,
-                        "fees": {
-                            "gasFee": 0.03, 
+                        "fees": { // in decimal format
+                            "gasFee": 0, 
                             "exchangeFee": 0, 
                             "withdrawalFee": 0
                         }
                     }
         this.baseUrl = ''
-        this.feesUrl = ''
         this.orderBookUrl = ''
+        this.feesUrl = ''
     }
 }
 
+// API docs: https://docs.ftx.com
 async function ftx() {
     let ftx = new ExchangeData()
     ftx.data["exchange"] = "ftx"
 
     ftx.baseUrl = `https://ftx.us`
-    ftx.feesUrl = `${ftx.baseUrl}/api/account`
     ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/DAI/USDT/orderbook?depth=20`
+    ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
     // add authentication headers for fee-related FTX API requests
     // https://blog.ftx.com/blog/api-authentication/ 
@@ -90,7 +90,13 @@ async function ftx() {
         return {"bids": bids, "asks": asks}
     }
 
-    // TODO: function getFees(response)
+    function getFees(response) {
+        accountInfo = response.data["result"]
+        
+        takerFee = accountInfo["takerFee"]
+
+        return takerFee
+    }
 
     // make async API requests in parallel and
     // store the responses in an iterable Promise instance
@@ -103,6 +109,7 @@ async function ftx() {
         .then(responseArr => {
             // this is what the Promise does when it resolves
             ftx.data["orderbook"] = getOrderbook(responseArr[0])
+            ftx.data["fees"]["exchangeFee"] = getFees(responseArr[1])
             return ftx.data
         })
         .catch(err => {
@@ -114,18 +121,6 @@ async function ftx() {
     // return the FTX data object
     return loadData()
 }
-
-
-// let allData = {'ftx': null }
-// this logs the right thing - but doesn't change the global variable
-// ftx().then(res => {
-//     // console.log(res)
-//     allData["ftx"] = res
-//     console.log(allData)
-// })
-
-
-
 
 async function kucoin() {
     let kucoin = new ExchangeData()
@@ -159,37 +154,15 @@ async function kucoin() {
     return loadData()
 }
 
-// call async functions and
-// get resolved value of their Promises
-async function loadAllData() {
-    let allData = {'ftx': null }
+// API docs: https://docs.kraken.com/rest 
+async function kraken() {
+    let kraken = new ExchangeData()
+    kraken.data["exchange"] = "kraken"
 
-    // load data
-    let ftxData = await ftx()
-    let kucoinData = await kucoin() 
-    // test = ftxData["exchange"]
-    // allData[test] = 0
-    // test = kucoinData["exchange"]
-    console.log(kucoinData)
-
-    // return allData
-}
-
-// $ node index.js
-loadAllData().then(allData => {
-    console.log("running")
-    // console.log(allData)
-})
-
-// console.log(allData)
-
-kraken = function() {
-    config = {
-        method: 'get',
-        url: `https://api.kraken.com/0/public/Depth?pair=XBTUSD&count=5`
-    }
-    axios(config)
-    .then(function (response) {
+    kraken.baseUrl = 'https://api.kraken.com'
+    kraken.orderBookUrl = `${kraken.baseUrl}/0/public/Depth?pair=XBTUSD&count=5`
+    
+    function getOrderbook(response) {
         orderbook = response.data["result"]["XXBTZUSD"]
 
         // for every bid/ask, filter out the timestamp (third element)
@@ -201,16 +174,34 @@ kraken = function() {
         bids = JSON.parse(JSON.stringify(orderbook["bids"], reformat))
         asks = JSON.parse(JSON.stringify(orderbook["asks"], reformat))
         Object.keys(bids).forEach((k) => bids[k][2] == null && bids[k].splice(2));
+        Object.keys(asks).forEach((k) => bids[k][2] == null && bids[k].splice(2));
 
-        console.log(bids)
-        console.log(asks)
-    })
-    .catch(function (error) {
-        console.log()
-    })
+        return {"bids": bids, "asks": asks}
+    }
+
+    function loadData() {
+        return axios.all([
+            axios.get(kraken.orderBookUrl)
+        ])
+        .then(responseArr => {
+            kraken.data["orderbook"] = getOrderbook(responseArr[0])
+            return kraken.data
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+    
+    return loadData()
 }
 
 async function gemini() {
+    let gemini = new ExchangeData() 
+    gemini.data["exchange"] = "gemini"
+
+    gemini.baseUrl = "https://api.gemini.com"
+    gemini.orderBookUrl = `${gemini.baseUrl}/v1/book/btcusd`
+
     // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
     function getOrderbook(response) {
         orderbook = response.data
@@ -226,42 +217,43 @@ async function gemini() {
         bids = bidAskReformat(orderbook["bids"])
         asks = bidAskReformat(orderbook["asks"])
 
-        return [bids, asks]
+        return {"bids": bids, "asks": asks}
     }
 
-    const response = await axios.get(`https://api.gemini.com/v1/book/btcusd`)
+    function loadData() {
+        return axios.all([
+            axios.get(gemini.orderBookUrl)
+        ])
+        .then(responseArr => {
+            gemini.data["orderbook"] = getOrderbook(responseArr[0])
+            return gemini.data
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
 
-    // get orderbook (bids/asks)
-    // get fees
-    return getOrderbook(response)
+    return loadData()
 }
-
-// kucoin()
-//kraken()
-// gemini()
-
-let dict = {}
-
-// gemini()
-// .then(data => {
-//     // bids = data[0]
-//     // asks = data[1]
-//     // based on the orderbook (bids/asks), invoke a callback function 
-//     // to calculate the best execution price
-//     console.log(data)
-// })
-// .catch(err => console.log(err))
 
 // 'orderbook' is a dictionary
 // ['bids':[[Array], [Array]], 'asks': [[Array], [Array]]]
 // where Array = [price, amount] <-- both in number format
-function get_price_from_orderbook(orderbook, i_amount) {
-    var bids = orderbook["bids"];
+// orderbook = object
+// each bid = object: [number, number]
+async function getExchangePrice(orderbook, fees, i_amount) {
+    var bids = orderbook["bids"]; // object type
+    console.log(bids)
+    console.log(typeof(bids))
+    console.log(typeof(bids[0]))
+    console.log(typeof(bids[0][0]))
+    console.log(typeof(bids[0][1]))
     var total_amount = 0;
     var total_value = 0;
     var b = 0;
 
     // add up bids until wanted amount of tokens is calculated or entire orderbook has been parsed
+    // convert data types in each bid to 'number'
     while ((total_amount < i_amount) && (b < bids.length)){
         total_value += parseFloat(bids[b][0]) * parseFloat(bids[b][1]);
         total_amount += parseFloat(bids[b][1]);
@@ -282,9 +274,9 @@ function get_price_from_orderbook(orderbook, i_amount) {
     // now that our caluclated token amount is same as given token amount, we can calculate price per token
     if (total_amount = i_amount){
         // add fees
-        gasFee = total_value * orderbook["gasFee"];
-        exchangeFee = total_value * orderbook["exchangeFee"];
-        withdrawalFee = total_value * orderbook["withdrawalFee"];
+        gasFee = total_value * fees["gasFee"];
+        exchangeFee = total_value * fees["exchangeFee"];
+        withdrawalFee = total_value * fees["withdrawalFee"];
         total_value += gasFee + exchangeFee + withdrawalFee;
 
         // find price
@@ -297,6 +289,43 @@ function get_price_from_orderbook(orderbook, i_amount) {
 async function get_prices(i_ticker, f_ticker, i_amount){
 
 }
+
+// call async functions and
+// get resolved value of their Promises
+async function loadAllData() {
+    let allData = {'ftx': null }
+
+    // for every exchange, load its API data output -> 
+    // retrieve its orderbook and fees to calculate the execution price of the specified trade
+
+    // FTX
+    let ftxData = await ftx()
+    // ftxPrice = await getExchangePrice(ftxData.orderbook, ftxData.fees, 1)
+    // console.log(ftxPrice)
+
+    // KuCoin
+    let kucoinData = await kucoin() 
+    // kucoinPrice = await getExchangePrice(kucoinData.orderbook, kucoinData.fees, 1)
+    // console.log(kucoinPrice)
+
+    // Kraken
+    let krakenData = await kraken() 
+    // krakenPrice =  await getExchangePrice(krakenData.orderbook, krakenData.fees, 1)
+    // console.log(krakenPrice)
+
+    // Gemini
+    let geminiData = await gemini() 
+    geminiPrice = await getExchangePrice(geminiData.orderbook, geminiData.fees, 1)
+    console.log(geminiPrice)
+
+    // return allData
+}
+
+// $ node index.js
+loadAllData().then(allData => {
+    console.log("running")
+    // console.log(allData)
+})
 
 // main method ---------------------------------------------------------------------------------------------
 function main() {
@@ -376,4 +405,4 @@ function main() {
     console.log(price);
 }
 
-main()
+// main()

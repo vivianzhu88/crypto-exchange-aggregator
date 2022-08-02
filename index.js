@@ -4,6 +4,13 @@ const prompt = require('prompt-sync')();
 const crypto = require('crypto');
 const { response } = require('express');
 
+// user variables
+// hard-coded for now
+baseCurrency = 'BTC'
+quoteCurrency = 'USDT'
+orderbookDepth = 20
+quantity = 10000
+
 matcha = function() {
     config = {
         method: 'get',
@@ -34,7 +41,7 @@ class ExchangeData {
                         "orderbook": null,
                         "fees": { // in decimal format
                             "gasFee": 0, 
-                            "exchangeFee": 0, // maker or taker
+                            "exchangeFee": 0, 
                             "withdrawalFee": 0
                         }
                     }
@@ -55,7 +62,7 @@ async function ftx() {
     ftx.data["name"] = "ftx"
 
     ftx.baseUrl = `https://ftx.us`
-    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/BTC/USDT/orderbook?depth=20`
+    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/${baseCurrency}/${quoteCurrency}/orderbook?depth=${orderbookDepth}`
     ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
     // add authentication headers for fee-related FTX API requests

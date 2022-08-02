@@ -4,12 +4,6 @@ const prompt = require('prompt-sync')();
 const crypto = require('crypto');
 const { response } = require('express');
 
-// user variables
-// hard-coded for now
-baseCurrency = 'DAI'
-quoteCurrency = 'USDT'
-quantity = 10000
-
 matcha = function() {
     config = {
         method: 'get',
@@ -157,12 +151,17 @@ async function kucoin() {
 }
 
 // API docs: https://docs.kraken.com/rest 
-async function kraken() {
+async function kraken(initTicker, finalTicker) {
     let kraken = new ExchangeData()
     kraken.data["name"] = "kraken"
 
+    // hard-coded: pair=XBTUSD
+    // reformat user input if needed
+
+    // Kraken URLs
     kraken.baseUrl = 'https://api.kraken.com'
-    kraken.orderBookUrl = `${kraken.baseUrl}/0/public/Depth?pair=XBTUSD&count=5`
+    // Set maximum number of bids/asks to 0 to get full order book
+    kraken.orderBookUrl = `${kraken.baseUrl}/0/public/Depth?pair=${initTicker}${finalTicker}&count=0`
     
     function getOrderbook(response) {
         orderbook = response.data["result"]["XXBTZUSD"]
@@ -197,12 +196,16 @@ async function kraken() {
     return loadData()
 }
 
-async function gemini() {
+async function gemini(initTicker, finalTicker) {
     let gemini = new ExchangeData() 
     gemini.data["name"] = "gemini"
 
+    // hard-coded: btcusd
+
+    // Gemini URLs
     gemini.baseUrl = "https://api.gemini.com"
-    gemini.orderBookUrl = `${gemini.baseUrl}/v1/book/btcusd`
+    // Limit bids/asks to 0 to get full order book
+    gemini.orderBookUrl = `${gemini.baseUrl}/v1/book/${initTicker}${finalTicker}?limit_bids=0&limit_asks=0` 
 
     // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
     function getOrderbook(response) {
@@ -293,21 +296,21 @@ function getExchangePrice(orderbook, fees, i_amount) {
 // call async functions and
 // get resolved value of their Promises
 // for EXCHANGE data
-async function loadAllData() {
+async function loadAllData(initTicker, finalTicker, initAmount) {
     // load API data from all exchanges in parallel
     return await Promise.allSettled([
         ftx(), 
         kucoin(), 
-        kraken(), 
-        gemini()
+        kraken(initTicker, finalTicker), 
+        gemini(initTicker, finalTicker)
     ])
 }
 
 // where to store initial/final tickers and amount?
-async function getAllPrices(init_ticker, final_ticker, init_amount) {
+async function getAllPrices(initTicker, finalTicker, initAmount) {
     let allPrices = []
 
-    const allData = await loadAllData();
+    const allData = await loadAllData(initTicker, finalTicker, initAmount);
     for (let i = 0; i < allData.length; i++) {
         exchangeData = allData[i]
         exchangeName = exchangeData.value.name
@@ -333,37 +336,37 @@ async function getAllPrices(init_ticker, final_ticker, init_amount) {
         }
     }
 
-    var output_string = "";
+    var outputString = "";
     for (let i = 0; i < output.length; i++) { //i is path
         price = output[i][0];
-        output_string += "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + init_ticker + "/" + final_ticker + ")\n\n";
+        outputString += "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + initTicker + "/" + finalTicker + ")\n\n";
         for (let j = 1; j < output[i].length; j++) { //j is # exchanges - 1
             exchange = output[i][j];
             if (exchange.length > 2){ //there is intermediary token
-                output_string += "  - <" + exchange[0] + "> " + exchange[1] + " " + init_ticker + " to " + exchange[2] + ", " + exchange[3] + " " + exchange[2] +  " to " + final_ticker + "\n";
+                outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + exchange[2] + ", " + exchange[3] + " " + exchange[2] +  " to " + finalTicker + "\n";
             }
             else{
-                output_string += "  - <" + exchange[0] + "> " + exchange[1] + " " + init_ticker + " to " + final_ticker + "\n";
+                outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + finalTicker + "\n";
             }
         }
     }
 
-    return output_string
+    return outputString
 }
 
 //$ node index.js
 
 // main method ---------------------------------------------------------------------------------------------
 function main() {
-    var init_ticker = prompt("Ticker of the token you have: ");
-    var final_ticker = prompt("Ticker of the token you want to trade into: ");
-    var init_amount = parseFloat(prompt("How much " + init_ticker + " do you want to trade? "));
-    console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_ticker);
+    var initTicker = prompt("Ticker of the token you have: ");
+    var finalTicker = prompt("Ticker of the token you want to trade into: ");
+    var initAmount = parseFloat(prompt("How much " + initTicker + " do you want to trade? "));
+    console.log("\nConverting " + initAmount + " " + initTicker + " to " + finalTicker);
 
     //get prices from all exchanges
     //each list inside main list represents a path
     //format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
-    getAllPrices(init_ticker, final_ticker, init_amount).then(result => {
+    getAllPrices(initTicker, finalTicker, initAmount).then(result => {
         console.log(result)
     })
     //output = get_prices(init_ticker, final_ticker, init_amount);

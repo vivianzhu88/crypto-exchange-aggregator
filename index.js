@@ -32,14 +32,11 @@ matcha = function() {
     });
 }
 
-// matcha()
-
-
 // CEX APIs ---------------------------------------------------------------------------------------------
 
 class ExchangeData {
     constructor() {
-        this.data = {   "exchange": "", 
+        this.data = {   "name": "", 
                         "orderbook": null,
                         "fees": { // in decimal format
                             "gasFee": 0, 
@@ -50,13 +47,18 @@ class ExchangeData {
         this.baseUrl = ''
         this.orderBookUrl = ''
         this.feesUrl = ''
+
+        // this.name
+        // this.hasOrderbook = 
+        // this.orderbook
+        // this.fees
     }
 }
 
 // API docs: https://docs.ftx.com
 async function ftx() {
     let ftx = new ExchangeData()
-    ftx.data["exchange"] = "ftx"
+    ftx.data["name"] = "ftx"
 
     ftx.baseUrl = `https://ftx.us`
     ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/DAI/USDT/orderbook?depth=20`
@@ -124,7 +126,7 @@ async function ftx() {
 
 async function kucoin() {
     let kucoin = new ExchangeData()
-    kucoin.data["exchange"] = "kucoin"
+    kucoin.data["name"] = "kucoin"
 
     kucoin.baseUrl = 'https://api.kucoin.com'
     kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=BTC-USDC`
@@ -157,7 +159,7 @@ async function kucoin() {
 // API docs: https://docs.kraken.com/rest 
 async function kraken() {
     let kraken = new ExchangeData()
-    kraken.data["exchange"] = "kraken"
+    kraken.data["name"] = "kraken"
 
     kraken.baseUrl = 'https://api.kraken.com'
     kraken.orderBookUrl = `${kraken.baseUrl}/0/public/Depth?pair=XBTUSD&count=5`
@@ -197,7 +199,7 @@ async function kraken() {
 
 async function gemini() {
     let gemini = new ExchangeData() 
-    gemini.data["exchange"] = "gemini"
+    gemini.data["name"] = "gemini"
 
     gemini.baseUrl = "https://api.gemini.com"
     gemini.orderBookUrl = `${gemini.baseUrl}/v1/book/btcusd`
@@ -241,13 +243,16 @@ async function gemini() {
 // where Array = [price, amount] <-- both in number format
 // orderbook = object
 // each bid = object: [number, number]
-async function getExchangePrice(orderbook, fees, i_amount) {
+// should this be async?
+function getExchangePrice(orderbook, fees, i_amount) {
+    // condition check - CEX would have an orderbook, otherwise just get price
+
     var bids = orderbook["bids"]; // object type
-    console.log(bids)
-    console.log(typeof(bids))
-    console.log(typeof(bids[0]))
-    console.log(typeof(bids[0][0]))
-    console.log(typeof(bids[0][1]))
+    // console.log(bids)
+    // console.log(typeof(bids))
+    // console.log(typeof(bids[0]))
+    // console.log(typeof(bids[0][0]))
+    // console.log(typeof(bids[0][1]))
     var total_amount = 0;
     var total_value = 0;
     var b = 0;
@@ -285,46 +290,40 @@ async function getExchangePrice(orderbook, fees, i_amount) {
     }
 }
 
-// {'exchange1': price, 'exchange2': price}
-async function get_prices(i_ticker, f_ticker, i_amount){
-
-}
-
 // call async functions and
 // get resolved value of their Promises
+// for EXCHANGE data
 async function loadAllData() {
-    let allData = {'ftx': null }
+    // load API data from all exchanges in parallel
+    return await Promise.allSettled([
+        ftx(), 
+        kucoin(), 
+        kraken(), 
+        gemini()
+    ])
+}
 
-    // for every exchange, load its API data output -> 
-    // retrieve its orderbook and fees to calculate the execution price of the specified trade
+// where to store initial/final tickers and amount?
+async function getAllPrices() {
+    let allPrices = {}
 
-    // FTX
-    let ftxData = await ftx()
-    // ftxPrice = await getExchangePrice(ftxData.orderbook, ftxData.fees, 1)
-    // console.log(ftxPrice)
-
-    // KuCoin
-    let kucoinData = await kucoin() 
-    // kucoinPrice = await getExchangePrice(kucoinData.orderbook, kucoinData.fees, 1)
-    // console.log(kucoinPrice)
-
-    // Kraken
-    let krakenData = await kraken() 
-    // krakenPrice =  await getExchangePrice(krakenData.orderbook, krakenData.fees, 1)
-    // console.log(krakenPrice)
-
-    // Gemini
-    let geminiData = await gemini() 
-    geminiPrice = await getExchangePrice(geminiData.orderbook, geminiData.fees, 1)
-    console.log(geminiPrice)
-
-    // return allData
+    const allData = await loadAllData();
+    for (let i = 0; i < allData.length; i++) {
+        exchangeData = allData[i]
+        exchangeName = exchangeData.value.name
+        // for every exchange, use its orderbook and fees data to calculate the execution price of the specified trade
+        if (exchangeData.status == 'fulfilled') {
+            exchangePrice = getExchangePrice(exchangeData.value.orderbook, exchangeData.value.fees, 1) // await?
+            allPrices[exchangeName] = exchangePrice
+        }
+    }
+    
+    return allPrices
 }
 
 // $ node index.js
-loadAllData().then(allData => {
-    console.log("running")
-    // console.log(allData)
+getAllPrices().then(result => {
+    console.log(result)
 })
 
 // main method ---------------------------------------------------------------------------------------------
@@ -370,39 +369,6 @@ function main() {
         }
         console.log(output_string);
     }
-
-    orderbook = 
-    {
-        "exchange" : "ftx",
-        "bids": [
-            [ '23246.3', '0.81' ],
-            [ '23246.1', '0.06208339' ],
-            [ '23245.6', '0.083' ],
-            [ '23245.4', '0.02281999' ],
-            [ '23244', '0.03208211' ],
-            [ '23242.8', '0.08' ],
-            [ '23240.8', '0.24767706' ],
-            [ '23240.7', '0.0480163' ],
-            [ '23240.4', '0.00128814' ],
-            [ '23240', '0.20497708' ],
-            [ '23235', '0.20181905' ],
-            [ '23230.4', '0.03270318' ],
-            [ '23230.3', '0.2066525' ],
-            [ '23226.1', '0.1292' ],
-            [ '23225.5', '0.21261745' ],
-            [ '23224.8', '0.0449384' ],
-            [ '23224.1', '0.08987299' ],
-            [ '23223.3', '0.00063' ],
-            [ '23222.1', '0.36631511' ],
-            [ '23221.9', '0.01803837' ]
-          ],
-        "asks" : ["blah"],
-        "gasFee" : 0.03, 
-        "exchangeFee" : 0,
-        "withdrawalFee" : 0
-    };
-    price = get_price_from_orderbook(orderbook, init_amount);
-    console.log(price);
 }
 
 // main()

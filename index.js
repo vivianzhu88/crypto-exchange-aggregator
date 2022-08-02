@@ -304,8 +304,8 @@ async function loadAllData() {
 }
 
 // where to store initial/final tickers and amount?
-async function getAllPrices() {
-    let allPrices = {}
+async function getAllPrices(init_ticker, final_ticker, init_amount) {
+    let allPrices = []
 
     const allData = await loadAllData();
     for (let i = 0; i < allData.length; i++) {
@@ -314,34 +314,13 @@ async function getAllPrices() {
         // for every exchange, use its orderbook and fees data to calculate the execution price of the specified trade
         if (exchangeData.status == 'fulfilled') {
             exchangePrice = getExchangePrice(exchangeData.value.orderbook, exchangeData.value.fees, 1) // await?
-            allPrices[exchangeName] = exchangePrice
+
+            allPrices.push([exchangePrice, [exchangeName, 1]]);
+            //allPrices[exchangeName] = exchangePrice
         }
     }
     
-    return allPrices
-}
-
-// $ node index.js
-getAllPrices().then(result => {
-    console.log(result)
-})
-
-// main method ---------------------------------------------------------------------------------------------
-function main() {
-    var init_ticker = prompt("Ticker of the token you have: ");
-    var final_ticker = prompt("Ticker of the token you want to trade into: ");
-    var init_amount = parseFloat(prompt("How much " + init_ticker + " do you want to trade? "));
-    console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_ticker);
-
-    //get prices from all exchanges
-    //each list inside main list represents a path
-    //format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
-    output = [
-        [200 , ["Matcha" , 5]],
-        [543291 , ["Kucoin" , 2], ["FTX" , 4], ["Matcha" , 1]],
-        [100000 , ["FTX" , 1 , "USDT", 5 ]]
-    ];
-    //output = get_prices(init_ticker, final_ticker, init_amount);
+    output = allPrices;
 
     //bubble sort algorithm lowest price -> highest price
     for (var i = 0; i < output.length-1; i++){
@@ -369,6 +348,28 @@ function main() {
         }
         console.log(output_string);
     }
+
+    return output_string
 }
 
-// main()
+//$ node index.js
+
+// main method ---------------------------------------------------------------------------------------------
+function main() {
+    var init_ticker = prompt("Ticker of the token you have: ");
+    var final_ticker = prompt("Ticker of the token you want to trade into: ");
+    var init_amount = parseFloat(prompt("How much " + init_ticker + " do you want to trade? "));
+    console.log("\nConverting " + init_amount + " " + init_ticker + " to " + final_ticker);
+
+    //get prices from all exchanges
+    //each list inside main list represents a path
+    //format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
+    getAllPrices(init_ticker, final_ticker, init_amount).then(result => {
+        console.log(result)
+    })
+    //output = get_prices(init_ticker, final_ticker, init_amount);
+
+
+}
+
+main()

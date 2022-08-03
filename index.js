@@ -4,56 +4,77 @@ const prompt = require('prompt-sync')();
 const crypto = require('crypto');
 const { response } = require('express');
 
-// user variables
-// hard-coded for now
-baseCurrency = 'BTC'
-quoteCurrency = 'USDT'
-orderbookDepth = 20
-quantity = 10000
-
-matcha = function() {
-    config = {
-        method: 'get',
-        url: `https://api.0x.org/swap/v1/price?buyToken=${baseCurrency}&sellToken=${quoteCurrency}&sellAmount=${quantity}`
-    }
-    axios(config)
-    .then(function (response) {
-        console.log(response.data["price"])
-        // "estimatedPriceImpact"
-        // "value"
-        // "gasPrice"
-        // "gas"
-        // "estimatedGas"
-        // "protocolFee"
-        // "minimumProtocolFee"
-        // console.log(price)
-    })
-    .catch(function (error) {
-        console.log(error);
-    });
-}
-
 // CEX APIs ---------------------------------------------------------------------------------------------
 
 class ExchangeData {
     constructor() {
+        // flag to distinguish between CEX vs. DEX aggregator
+        // the latter does not provide orderbooks
+        this.hasOrderbook = true // default is CEX
+
+        // data to be returned from every exchange/aggregator
+        // after modifying with (API) data;
+        // needed to make price calculations and format output
         this.data = {   "name": "", 
-                        "orderbook": null,
+                        "orderbook": null,  // provided by CEX
+                        "price": null,      // provided by DEX aggregator
                         "fees": { // in decimal format
                             "gasFee": 0, 
                             "exchangeFee": 0, 
                             "withdrawalFee": 0
                         }
                     }
-        this.baseUrl = ''
-        this.orderBookUrl = ''
-        this.feesUrl = ''
 
-        // this.name
-        // this.hasOrderbook = 
-        // this.orderbook
-        // this.fees
+        // URLs to make API calls
+        this.baseUrl = ''
+        this.orderBookUrl = ''  // needed for CEX
+        this.priceUrl = ''      // needed for DEX aggregator
+        this.feesUrl = ''
     }
+}
+
+async function matcha(initTicker, finalTicker, initAmount) {
+    let matcha = new ExchangeData()
+    matcha.data["name"] = "matcha"
+
+    matcha.baseUrl = `https://api.0x.org`
+    // https://docs.0x.org/0x-api-swap/api-references/get-swap-v1-price
+    matcha.priceUrl = `${matcha.baseUrl}/swap/v1/price?sellToken=${initTicker}&buyToken=${finalTicker}&sellAmount=${initAmount}`
+
+    // returns price of initial (sell) token in final (buy) token
+    function getPrice(response) {
+        price = response.data["price"]
+
+        return price
+    }
+
+    // function getFees
+    // "gas"
+    // "estimatedGas"
+    // "protocolFee"
+    // "minimumProtocolFee"
+
+    function loadData() {
+        return axios.all([
+            axios.get(matcha.priceUrl),
+            // axios.get(matcha.feesUrl),
+        ])
+        .then(responseArr => {
+            // this is what the Promise does when it resolves
+            matcha.data["price"] = getPrice(responseArr[0])
+            // matcha.data["fees"]["exchangeFee"] = getFees(responseArr[1])
+            return matcha.data
+        })
+        .catch(err => {
+            console.log(err["response"]["data"]["validationErrors"])
+            // reason = err["data"]["reason"]
+            // console.log(reason)
+        })
+    }
+
+    // receive and resolve the Promise and
+    // return the FTX data object
+    return loadData()
 }
 
 // API docs: https://docs.ftx.com
@@ -129,8 +150,13 @@ async function kucoin(initTicker, finalTicker) {
     let kucoin = new ExchangeData()
     kucoin.data["name"] = "kucoin"
 
+    // reformat user input if needed
+    if (finalTicker == "USD") finalTicker = "USDC"
+
+    // KuCoin URLs
     kucoin.baseUrl = 'https://api.kucoin.com'
-    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2?symbol=${initTicker}-${finalTicker}`
+    // https://docs.kucoin.com/#get-full-order-book-aggregated 
+    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=${initTicker}-${finalTicker}`
 
     function getOrderbook(response) {
         orderbook = response.data["data"]
@@ -162,8 +188,8 @@ async function kraken(initTicker, finalTicker) {
     let kraken = new ExchangeData()
     kraken.data["name"] = "kraken"
 
-    // hard-coded: pair=XBTUSD
     // reformat user input if needed
+    if (initTicker == "BTC") initTicker = "XBT"
 
     // Kraken URLs
     kraken.baseUrl = 'https://api.kraken.com'
@@ -303,13 +329,18 @@ function getExchangePrice(orderbook, fees, i_amount) {
 // call async functions and
 // get resolved value of their Promises
 // for EXCHANGE data
+// return format: [ { status: 'fulfilled', value: undefined } ]
 async function loadAllData(initTicker, finalTicker, initAmount) {
-    // load API data from all exchanges in parallel
+    // load API data from all exchanges/aggregators in parallel
     return await Promise.allSettled([
-        ftx(initTicker, finalTicker), 
-        kucoin(initTicker, finalTicker), 
-        kraken(initTicker, finalTicker), 
-        gemini(initTicker, finalTicker)
+        // DEX aggregators
+        // matcha(initTicker, finalTicker, initAmount),
+
+        // CEX
+        // ftx(initTicker, finalTicker), 
+        // kucoin(initTicker, finalTicker), 
+        // kraken(initTicker, finalTicker), 
+        // gemini(initTicker, finalTicker)
     ])
 }
 
@@ -317,9 +348,11 @@ async function loadAllData(initTicker, finalTicker, initAmount) {
 async function getAllPrices(initTicker, finalTicker, initAmount) {
     let allPrices = []
 
-    const allData = await loadAllData(initTicker, finalTicker, initAmount);
+    const allData = await loadAllData(initTicker, finalTicker, initAmount); 
+    
     for (let i = 0; i < allData.length; i++) {
         exchangeData = allData[i]
+        // if exchangeData.value is not undefined!
         exchangeName = exchangeData.value.name
         // for every exchange, use its orderbook and fees data to calculate the execution price of the specified trade
         if (exchangeData.status == 'fulfilled') {
@@ -365,8 +398,8 @@ async function getAllPrices(initTicker, finalTicker, initAmount) {
 
 // main method ---------------------------------------------------------------------------------------------
 function main() {
-    var initTicker = prompt("Ticker of the token you have: ");
-    var finalTicker = prompt("Ticker of the token you want to trade into: ");
+    var initTicker = prompt("Ticker of the token you have: ").toUpperCase()
+    var finalTicker = prompt("Ticker of the token you want to trade into: ").toUpperCase()
     var initAmount = parseFloat(prompt("How much " + initTicker + " do you want to trade? "));
     console.log("\nConverting " + initAmount + " " + initTicker + " to " + finalTicker);
 

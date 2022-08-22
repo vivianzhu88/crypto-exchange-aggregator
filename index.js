@@ -7,15 +7,15 @@ const { response } = require('express');
 // CEX APIs ---------------------------------------------------------------------------------------------
 
 class ExchangeData {
-    constructor() {
+    constructor(hasOrderbook, name, baseUrl) {
         // flag to distinguish between CEX vs. DEX aggregator
         // the latter does not provide orderbooks
-        this.hasOrderbook = true // default is CEX
+        this.hasOrderbook = hasOrderbook 
 
         // data to be returned from every exchange/aggregator
         // after modifying with (API) data;
         // needed to make price calculations and format output
-        this.data = {   "name": "", 
+        this.data = {   "name": name, 
                         "orderbook": null,  // provided by CEX
                         "price": null,      // provided by DEX aggregator
                         "fees": { // in decimal format
@@ -26,64 +26,61 @@ class ExchangeData {
                     }
 
         // URLs to make API calls
-        this.baseUrl = ''
-        this.orderBookUrl = ''  // needed for CEX
-        this.priceUrl = ''      // needed for DEX aggregator
+        this.baseUrl = baseUrl
+        this.calculationUrl = '' // orderbook URL if CEX, price URL if DEX aggregator
         this.feesUrl = ''
     }
 }
 
 async function matcha(initTicker, finalTicker, initAmount) {
-    let matcha = new ExchangeData()
-    matcha.data["name"] = "matcha"
-
-    matcha.baseUrl = `https://api.0x.org`
+    let matcha = new ExchangeData(
+                        false,
+                        "matcha", 
+                        "https://api.0x.org"
+                    )
     // https://docs.0x.org/0x-api-swap/api-references/get-swap-v1-price
-    matcha.priceUrl = `${matcha.baseUrl}/swap/v1/price?sellToken=${initTicker}&buyToken=${finalTicker}&sellAmount=${initAmount}`
+    matcha.calculationUrl = `${matcha.baseUrl}/swap/v1/price?sellToken=${initTicker}&buyToken=${finalTicker}&sellAmount=${initAmount}`,
+    console.log(matcha.calculationUrl)
 
-    // returns price of initial (sell) token in final (buy) token
     function getPrice(response) {
-        price = response.data["price"]
-
-        return price
+        return response.data["price"]
     }
 
-    // function getFees
-    // "gas"
-    // "estimatedGas"
-    // "protocolFee"
-    // "minimumProtocolFee"
+    function getFees(response) {
+        return {
+            "gasFee": response.data["gas"]
+        }
+    }
 
     function loadData() {
         return axios.all([
-            axios.get(matcha.priceUrl),
-            // axios.get(matcha.feesUrl),
+            axios.get(matcha.calculationUrl)
+            // axios.get(matcha.feesUrl)
         ])
         .then(responseArr => {
-            // this is what the Promise does when it resolves
             matcha.data["price"] = getPrice(responseArr[0])
-            // matcha.data["fees"]["exchangeFee"] = getFees(responseArr[1])
+            // matcha.data["fees"]["gasFee"] = getFees(responseArr[1])
             return matcha.data
         })
         .catch(err => {
-            console.log(err["response"]["data"]["validationErrors"])
+            // console.log(err["response"]["data"]["validationErrors"])
             // reason = err["data"]["reason"]
             // console.log(reason)
+            console.log(err)
         })
     }
 
-    // receive and resolve the Promise and
-    // return the FTX data object
     return loadData()
 }
 
 // API docs: https://docs.ftx.com
 async function ftx(initTicker, finalTicker) {
-    let ftx = new ExchangeData()
-    ftx.data["name"] = "ftx"
-
-    ftx.baseUrl = `https://ftx.us`
-    ftx.orderBookUrl = `${ftx.baseUrl}/api/markets/${initTicker}/${finalTicker}/orderbook?depth=100` //100 is max
+    let ftx = new ExchangeData(
+                    true, 
+                    "ftx",
+                    "https://ftx.us"
+                )
+    ftx.calculationUrl = `${ftx.baseUrl}/api/markets/${initTicker}/${finalTicker}/orderbook?depth=100` //100 is max
     ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
     // add authentication headers for fee-related FTX API requests
@@ -127,7 +124,7 @@ async function ftx(initTicker, finalTicker) {
     function loadData() {
         config = ftxConfig()
         return axios.all([
-            axios.get(ftx.orderBookUrl, config),
+            axios.get(ftx.calculationUrl, config),
             axios.get(ftx.feesUrl, config),
         ])
         .then(responseArr => {
@@ -137,7 +134,9 @@ async function ftx(initTicker, finalTicker) {
             return ftx.data
         })
         .catch(err => {
-            console.log(err)
+            // this is what the Promise does when it rejects
+            // console.log(err)
+            return Promise.reject(err)
         })
     }
 
@@ -147,16 +146,16 @@ async function ftx(initTicker, finalTicker) {
 }
 
 async function kucoin(initTicker, finalTicker) {
-    let kucoin = new ExchangeData()
-    kucoin.data["name"] = "kucoin"
+    let kucoin = new ExchangeData(
+                        true, 
+                        "kucoin",
+                        "https://api.kucoin.com"
+                    )
+    // https://docs.kucoin.com/#get-full-order-book-aggregated 
+    kucoin.calculationUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=${initTicker}-${finalTicker}`
 
     // reformat user input if needed
     if (finalTicker == "USD") finalTicker = "USDC"
-
-    // KuCoin URLs
-    kucoin.baseUrl = 'https://api.kucoin.com'
-    // https://docs.kucoin.com/#get-full-order-book-aggregated 
-    kucoin.orderBookUrl = `${kucoin.baseUrl}/api/v1/market/orderbook/level2_20?symbol=${initTicker}-${finalTicker}`
 
     function getOrderbook(response) {
         orderbook = response.data["data"]
@@ -169,7 +168,7 @@ async function kucoin(initTicker, finalTicker) {
 
     function loadData() {
         return axios.all([
-            axios.get(kucoin.orderBookUrl)
+            axios.get(kucoin.calculationUrl)
         ])
         .then(responseArr => {
             kucoin.data["orderbook"] = getOrderbook(responseArr[0])
@@ -185,16 +184,16 @@ async function kucoin(initTicker, finalTicker) {
 
 // API docs: https://docs.kraken.com/rest 
 async function kraken(initTicker, finalTicker) {
-    let kraken = new ExchangeData()
-    kraken.data["name"] = "kraken"
+    let kraken = new ExchangeData(
+                        true, 
+                        "kraken",
+                        "https://api.kraken.com"
+                    )
+    // Set maximum number of bids/asks to 0 to get full order book
+    kraken.calculationUrl = `${kraken.baseUrl}/0/public/Depth?pair=${initTicker}${finalTicker}&count=0`
 
     // reformat user input if needed
     if (initTicker == "BTC") initTicker = "XBT"
-
-    // Kraken URLs
-    kraken.baseUrl = 'https://api.kraken.com'
-    // Set maximum number of bids/asks to 0 to get full order book
-    kraken.orderBookUrl = `${kraken.baseUrl}/0/public/Depth?pair=${initTicker}${finalTicker}&count=0`
     
     function getOrderbook(response) {
         orderbook = response.data["result"]["XXBTZUSD"]
@@ -215,7 +214,7 @@ async function kraken(initTicker, finalTicker) {
 
     function loadData() {
         return axios.all([
-            axios.get(kraken.orderBookUrl)
+            axios.get(kraken.calculationUrl)
         ])
         .then(responseArr => {
             kraken.data["orderbook"] = getOrderbook(responseArr[0])
@@ -230,15 +229,15 @@ async function kraken(initTicker, finalTicker) {
 }
 
 async function gemini(initTicker, finalTicker) {
-    let gemini = new ExchangeData() 
-    gemini.data["name"] = "gemini"
+    let gemini = new ExchangeData(
+                        true, 
+                        "gemini",
+                        "https://api.gemini.com"
+                    ) 
+    // Limit bids/asks to 0 to get full order book
+    gemini.calculationUrl = `${gemini.baseUrl}/v1/book/${initTicker}${finalTicker}?limit_bids=0&limit_asks=0` 
 
     // hard-coded: btcusd
-
-    // Gemini URLs
-    gemini.baseUrl = "https://api.gemini.com"
-    // Limit bids/asks to 0 to get full order book
-    gemini.orderBookUrl = `${gemini.baseUrl}/v1/book/${initTicker}${finalTicker}?limit_bids=0&limit_asks=0` 
 
     // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
     function getOrderbook(response) {
@@ -260,7 +259,7 @@ async function gemini(initTicker, finalTicker) {
 
     function loadData() {
         return axios.all([
-            axios.get(gemini.orderBookUrl)
+            axios.get(gemini.calculationUrl)
         ])
         .then(responseArr => {
             gemini.data["orderbook"] = getOrderbook(responseArr[0])
@@ -282,7 +281,6 @@ async function gemini(initTicker, finalTicker) {
 // should this be async?
 function getExchangePrice(orderbook, fees, i_amount) {
     // condition check - CEX would have an orderbook, otherwise just get price
-
     var bids = orderbook["bids"]; // object type
     // console.log(bids)
     // console.log(typeof(bids))
@@ -334,7 +332,7 @@ async function loadAllData(initTicker, finalTicker, initAmount) {
     // load API data from all exchanges/aggregators in parallel
     return await Promise.allSettled([
         // DEX aggregators
-        // matcha(initTicker, finalTicker, initAmount),
+        matcha(initTicker, finalTicker, initAmount),
 
         // CEX
         // ftx(initTicker, finalTicker), 
@@ -344,74 +342,69 @@ async function loadAllData(initTicker, finalTicker, initAmount) {
     ])
 }
 
-// where to store initial/final tickers and amount?
 async function getAllPrices(initTicker, finalTicker, initAmount) {
-    let allPrices = []
-
+    // --- load all API data based on user input ---
     const allData = await loadAllData(initTicker, finalTicker, initAmount); 
     
-    for (let i = 0; i < allData.length; i++) {
-        exchangeData = allData[i]
-        // if exchangeData.value is not undefined!
-        exchangeName = exchangeData.value.name
-        // for every exchange, use its orderbook and fees data to calculate the execution price of the specified trade
-        if (exchangeData.status == 'fulfilled') {
-            exchangePrice = getExchangePrice(exchangeData.value.orderbook, exchangeData.value.fees, 1) // await?
-
-            allPrices.push([exchangePrice, [exchangeName, 1]]);
-            //allPrices[exchangeName] = exchangePrice
+    // get resolved Promises' values
+    let allPrices = []
+    const fulfilled = allData.filter(data => data.status === 'fulfilled').map(data => data.value)
+    // console.log(fulfilled)
+    fulfilled.forEach((data) => {
+        // save exchange price mapped to exchange name
+        exchangeName = data.name
+        if (data.orderbook == null) {
+            exchangePrice = data.price
+        } else {
+            exchangePrice = getExchangePrice(data.orderbook, data.fees, 1) 
         }
-    }
-    
-    output = allPrices;
+        allPrices.push([exchangePrice, [exchangeName, 1]]); 
+    })
 
-    //bubble sort algorithm lowest price -> highest price
-    for (var i = 0; i < output.length-1; i++){
-        for (var j = 0, swapping; j < output.length-1; j++){
-            if (output[j][0] > output[j+1][0]){
-                swapping = output[j+1];
-                output[j+1] = output[j];
-                output[j] = swapping;
-            }
-        }
-    }
+    // get rejected Promises' reasons
+    const rejected = allData.filter(data => data.status === 'rejected').map(data => data.reason)
+    rejected.forEach((data) => {
+        console.log(data) // need the code
+    })
 
-    var outputString = "";
-    for (let i = 0; i < output.length; i++) { //i is path
-        price = output[i][0];
-        outputString += "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + initTicker + "/" + finalTicker + ")\n\n";
-        for (let j = 1; j < output[i].length; j++) { //j is # exchanges - 1
-            exchange = output[i][j];
-            if (exchange.length > 2){ //there is intermediary token
-                outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + exchange[2] + ", " + exchange[3] + " " + exchange[2] +  " to " + finalTicker + "\n";
-            }
-            else{
-                outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + finalTicker + "\n";
-            }
-        }
-    }
+    // if exchangeData.value is not undefined!
+    // error check
 
-    return outputString
+    // --- sort data from lowest price -> highest price ---
+    allPrices.sort((a, b) => a[0] - b[0])
+    console.log(allPrices) // testing purposes
+    return allPrices
 }
-
-//$ node index.js
 
 // main method ---------------------------------------------------------------------------------------------
 function main() {
+    // specify user input
     var initTicker = prompt("Ticker of the token you have: ").toUpperCase()
     var finalTicker = prompt("Ticker of the token you want to trade into: ").toUpperCase()
     var initAmount = parseFloat(prompt("How much " + initTicker + " do you want to trade? "));
     console.log("\nConverting " + initAmount + " " + initTicker + " to " + finalTicker);
 
-    //get prices from all exchanges
-    //each list inside main list represents a path
-    //format for ouput is [total price init/final ticker, [exchange, # init token to trade], [exchange, # init token to trade, intermediary token ticker, # intermediary token to trade]]
-    getAllPrices(initTicker, finalTicker, initAmount).then(result => {
-        console.log(result)
+    // get prices from all exchanges
+    getAllPrices(initTicker, finalTicker, initAmount).then(allPrices => {
+        // console.log(result)
+        // --- display output data ---
+        let outputString = "";
+        for (let i = 0; i < allPrices.length; i++) { //i is path
+            price = allPrices[i][0];
+            outputString += "____________________________\n" + (i+1) + ". PRICE: " + price + " (" + initTicker + "/" + finalTicker + ")\n\n";
+            for (let j = 1; j < allPrices[i].length; j++) { //j is # exchanges - 1
+                exchange = allPrices[i][j];
+                if (exchange.length > 2){ //there is intermediary token
+                    outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + exchange[2] + ", " + exchange[3] + " " + exchange[2] +  " to " + finalTicker + "\n";
+                }
+                else{
+                    outputString += "  - <" + exchange[0] + "> " + exchange[1] + " " + initTicker + " to " + finalTicker + "\n";
+                }
+            }
+        }
+        console.log(outputString)
     })
-    //output = get_prices(init_ticker, final_ticker, init_amount);
-
-
 }
 
+// load the program
 main()

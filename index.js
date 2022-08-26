@@ -5,16 +5,12 @@ const crypto = require('crypto');
 const qs     = require('qs');
 const { response } = require('express');
 
-// CEX APIs ---------------------------------------------------------------------------------------------
-
 class ExchangeData {
     constructor(hasOrderbook, name, baseUrl) {
-        // flag to distinguish between CEX vs. DEX aggregator
-        // the latter does not provide orderbooks
+        // flag to distinguish between CEX (true) vs. DEX aggregator (false)
         this.hasOrderbook = hasOrderbook 
 
-        // data to be returned from every exchange/aggregator
-        // after modifying with (API) data;
+        // data to be returned from every exchange/aggregator after modifying with (API) data;
         // needed to make price calculations and format output
         this.data = {   "name": name, 
                         "orderbook": null,  // provided by CEX
@@ -29,9 +25,11 @@ class ExchangeData {
         // URLs to make API calls
         this.baseUrl = baseUrl
         this.calculationUrl = '' // orderbook URL if CEX, price URL if DEX aggregator
-        this.feesUrl = ''
+        this.feesUrl = ''   
     }
 }
+
+// DEX aggregator ----------------------------------------------------------------------------------------------
 
 async function matcha(initTicker, finalTicker, initAmount) {
     let matcha = new ExchangeData(
@@ -39,7 +37,6 @@ async function matcha(initTicker, finalTicker, initAmount) {
                         "matcha", 
                         "https://api.0x.org"
                     )
-    // https://docs.0x.org/0x-api-swap/api-references/get-swap-v1-price
     matcha.calculationUrl = `${matcha.baseUrl}/swap/v1/price?sellToken=${initTicker}&buyToken=${finalTicker}&sellAmount=${initAmount}`
 
     function getPrice(response) {
@@ -71,7 +68,8 @@ async function matcha(initTicker, finalTicker, initAmount) {
     return loadData()
 }
 
-// API docs: https://docs.ftx.com
+// CEX ---------------------------------------------------------------------------------------------------------
+
 async function ftx(initTicker, finalTicker) {
     let ftx = new ExchangeData(
                     true, 
@@ -81,7 +79,6 @@ async function ftx(initTicker, finalTicker) {
     ftx.calculationUrl = `${ftx.baseUrl}/api/markets/${initTicker}/${finalTicker}/orderbook?depth=100` //100 is max
     ftx.feesUrl = `${ftx.baseUrl}/api/account`
 
-    // AUTH HEADERS: https://blog.ftx.com/blog/api-authentication/ 
     function config() {
         const FTX_KEY = 'L4dEDrXVRTvQdlzx2BDKJbcYE1s0dDM2edLY8OBW'
         const FTX_SECRET= 'ZJ4wI4O_n5wsywK0CiS9dj3KSPwb0p3RAE6NH_St'
@@ -123,7 +120,6 @@ async function ftx(initTicker, finalTicker) {
         .then(responseArr => {
             ftx.data["orderbook"] = getOrderbook(responseArr[0])
             ftx.data["fees"] = getFees(responseArr[1])
-            console.log(ftx.data)
             return ftx.data
         })
         .catch(err => {
@@ -144,7 +140,6 @@ async function kucoin(initTicker, finalTicker) {
                         "kucoin",
                         "https://api.kucoin.com"
                     )
-    // https://docs.kucoin.com/#get-full-order-book-aggregated 
     kucoin.calculationUrl = `${kucoin.baseUrl}/api/v3/market/orderbook/level2_20?symbol=${initTicker}-${finalTicker}`
 
     // reformat user input if needed
@@ -159,7 +154,7 @@ async function kucoin(initTicker, finalTicker) {
     }
 
     function loadData() {
-        config = kucoinConfig()
+        config = config()
         return axios.all([
             axios.get(kucoin.calculationUrl, config)
         ])
@@ -180,16 +175,13 @@ async function kucoin(initTicker, finalTicker) {
     return loadData()
 }
 
-// API docs: https://docs.kraken.com/rest 
 async function kraken(initTicker, finalTicker) {
     let kraken = new ExchangeData(
                         true, 
                         "kraken",
                         "https://api.kraken.com"
                     )
-    // set maximum number of bids/asks to 0 to get full order book
     kraken.calculationUrl = `${kraken.baseUrl}/0/public/Depth?pair=${initTicker}${finalTicker}&count=0`
-    // https://docs.kraken.com/rest/#tag/User-Data/operation/getTradeVolume 
     kraken.feesUrl = `${kraken.baseUrl}/0/private/TradeVolume`
 
     // reformat user input if needed
@@ -241,29 +233,25 @@ async function gemini(initTicker, finalTicker) {
                         "gemini",
                         "https://api.gemini.com"
                     ) 
-    // Limit bids/asks to 0 to get full order book
     gemini.calculationUrl = `${gemini.baseUrl}/v1/book/${initTicker}${finalTicker}?limit_bids=0&limit_asks=0` 
 
     // hard-coded: btcusd
 
-    // og format: { price: '20838.99', amount: '0.26479', timestamp: '1658861155' }
     function getOrderbook(response) {
         orderbook = response.data
 
-        function bidAskReformat(obj) {
+        // for every bid/ask, filter out the timestamp (third element)
+        function reformat(obj) {
             for (const [key, value] of Object.entries(obj)) {
                 delete value["timestamp"]
                 obj[key] = Object.values(value)
             }
             return obj
         }
-        
-        bids = bidAskReformat(orderbook["bids"])
-        asks = bidAskReformat(orderbook["asks"])
 
         return {
-            "bids": bids, 
-            "asks": asks
+            "bids": reformat(orderbook["bids"]), 
+            "asks": reformat(orderbook["asks"])
         }
     }
 
@@ -286,6 +274,8 @@ async function gemini(initTicker, finalTicker) {
 
     return loadData()
 }
+
+// get API data + perform calculations ---------------------------------------------------------------------
 
 function getExchangePrice(orderbook, fees, initAmount) {
     var bids = orderbook["bids"]; // object type
@@ -311,8 +301,6 @@ function getExchangePrice(orderbook, fees, initAmount) {
         console.log("Increase orderbook depth current amount: " + total_amount);
         return null;
     }
-
-    console.log(total_value)
 
     // now that our calculated token amount is same as given token amount, we can calculate price per token
     if (total_amount = initAmount){
@@ -365,11 +353,12 @@ async function getAllPrices(initTicker, finalTicker, initAmount) {
 
     // --- sort data from lowest price -> highest price ---
     allPrices.sort((a, b) => a[0] - b[0])
-    console.log(allPrices) // testing purposes
+    // console.log(allPrices) // testing purposes
     return allPrices
 }
 
 // main method ---------------------------------------------------------------------------------------------
+
 function main() {
     // --- specify user input ---
     var initTicker = prompt("Ticker of the token you have: ").toUpperCase()
@@ -397,5 +386,4 @@ function main() {
     })
 }
 
-// load the program
-main()
+main() // load the program

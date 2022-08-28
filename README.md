@@ -30,8 +30,8 @@ Orderbook algorithm (applied to CEXs)
 - Look at “bid” side of orderbook
 - Add up bids until desired amount of token A is calculated OR reached end of orderbook
 - Account for excess [subtract extras] or deficiency [end of orderbook reached] of calculated token amount 
-      - Now, the calculated token amount equals given token amount
+     - Now, the calculated token amount equals given token amount
 - Determine gas, exchange, and withdrawal fees
-      - Total Value Paid = Total Value of Tokens + (Total Value of Tokens * fee1) + (Total Value of Tokens * fee2) + …
+     - Total Value Paid = Total Value of Tokens + (Total Value of Tokens * fee1) + (Total Value of Tokens * fee2) + …
 - Price = (Total Value Paid)/(Token Amount)
 

@@ -2,14 +2,14 @@
 
 Project Owners: Vivian Zhu and Stephanie Yen
 
-##About this product
+## About this product
 
 Given any two assets, it is time-consuming to compare trades on multiple cryptocurrency exchanges, whether they are decentralized (DEX) or centralized (CEX) or both. Our solution is to build an aggregator of DEXes and CEXes which will simplify the exchange process for users to swap on by abstracting away their interactions with multiple exchanges. Our current in-scope approach will be to identify the optimal execution path(s) of trades on Ethereum and EVM-compatible chains.
 
 We will demo this product as a proof-of-concept for Seashell at the end of Summer 2022. Since there are not many existing DEX/CEX aggregators, this is a solution by which Seashell can establish itself as a competitive player. This would also be a good way to start building a long-term Seashell ecosystem and reputation in the crypto space.
 
 
-##Algorithm
+## Algorithm
 
 1. Select tokens
 - User enters the ticker of initial token A, ticker of final token B, and desired amount of token A to trade 
@@ -24,7 +24,7 @@ We will demo this product as a proof-of-concept for Seashell at the end of Summe
 - Each price is mapped to its associated DEX aggregator or CEX name
 
 
-##Orderbook Calculation Specifications
+## Orderbook Calculation Specifications
 
 Orderbook algorithm (applied to CEXs)
 - Look at “bid” side of orderbook
